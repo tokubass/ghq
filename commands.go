@@ -19,6 +19,7 @@ import (
 var Commands = []cli.Command{
 	commandGet,
 	commandList,
+	commandWhich,
 	commandLook,
 	commandImport,
 }
@@ -56,6 +57,13 @@ var commandList = cli.Command{
 		cli.BoolFlag{"full-path, p", "Print full paths"},
 		cli.BoolFlag{"unique", "Print unique subpaths"},
 	},
+}
+
+var commandWhich = cli.Command{
+	Name:        "which",
+	Usage:       "Show full path of local repository",
+	Description: `which`,
+	Action:      doWhich,
 }
 
 var commandLook = cli.Command{
@@ -112,6 +120,7 @@ type commandDoc struct {
 var commandDocs = map[string]commandDoc{
 	"get":     {"", "[-u] <repository URL> | [-u] [-p] <user>/<project>"},
 	"list":    {"", "[-p] [-e] [<query>]"},
+	"which":   {"", "<project> | <user>/<project> | <host>/<user>/<project>"},
 	"look":    {"", "<project> | <user>/<project> | <host>/<user>/<project>"},
 	"import":  {"", "[-u] [-p] starred <user> | [-u] pocket"},
 	"starred": {"import", "[-u] [-p] <user>"},
@@ -280,6 +289,34 @@ func doList(c *cli.Context) {
 			} else {
 				fmt.Println(repo.RelPath)
 			}
+		}
+	}
+}
+
+func doWhich(c *cli.Context) {
+	name := c.Args().First()
+
+	if name == "" {
+		cli.ShowCommandHelp(c, "which")
+		os.Exit(1)
+	}
+
+	reposFound := []*LocalRepository{}
+	walkLocalRepositories(func(repo *LocalRepository) {
+		if repo.Matches(name) {
+			reposFound = append(reposFound, repo)
+		}
+	})
+
+	switch len(reposFound) {
+	case 0:
+		utils.Log("error", "No repository found")
+	case 1:
+		fmt.Println(reposFound[0].FullPath)
+	default:
+		utils.Log("error", "More than one repositories are found; Try more precise name")
+		for _, repo := range reposFound {
+			utils.Log("error", "- "+strings.Join(repo.PathParts, "/"))
 		}
 	}
 }
